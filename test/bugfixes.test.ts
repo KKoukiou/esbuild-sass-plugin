@@ -18,12 +18,14 @@ describe('tests covering github issues', function () {
 
   it('#18 Multiple files with the same name results in only one file being imported', async function () {
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       entryPoints: ['./test/issues/18/entrypoint.js'],
       bundle: true,
       outdir: './test/issues/18/out',
       plugins: [sassPlugin({})]
     })
+    // Manually do an incremental build
+    await ctx.rebuild()
 
     expect(readTextFile('./test/issues/18/out/entrypoint.css'))
       .to.containIgnoreSpaces('.component_a { background: blue; }')
@@ -38,40 +40,46 @@ describe('tests covering github issues', function () {
 
     let step = 0
 
-    const result = await esbuild.build({
+    const plugins = [{
+      name: 'test-plugin',
+      setup(build) {
+        build.onEnd(result => {
+          const failure = result.errors;
+          switch (step) {
+            case 0:
+              expect(failure).to.be.null
+            writeTextFile('dep.scss', `$primary-color: #333; body { padding: 0 color: $primary-color; }`)
+            return step++
+              case 1:
+              expect(failure).to.be.not.null
+            writeTextFile('dep.scss', `$primary-color: #333; body { padding: 0; color: $primary-color; }`)
+            return step++
+              case 2:
+              expect(failure).to.be.null
+            writeTextFile('tmp.scss', `@use 'dep'; body {background-color: dep.$primary-color color: red }`)
+            return step++
+              case 3:
+              expect(failure).to.be.not.null
+            writeTextFile('tmp.scss', `@use 'dep'; body {background-color: dep.$primary-color; color: red }`)
+            return step++
+              case 4:
+              expect(failure).to.be.null
+            expect(result).to.be.not.null
+            result!.stop!()
+            return step++
+          }
+        })
+      }
+    }]
+
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./tmp.scss'],
       outfile: './tmp.css',
       plugins: [sassPlugin()],
       logLevel: 'silent',
-      watch: {
-        onRebuild(failure, result) {
-          switch (step) {
-            case 0:
-              expect(failure).to.be.null
-              writeTextFile('dep.scss', `$primary-color: #333; body { padding: 0 color: $primary-color; }`)
-              return step++
-            case 1:
-              expect(failure).to.be.not.null
-              writeTextFile('dep.scss', `$primary-color: #333; body { padding: 0; color: $primary-color; }`)
-              return step++
-            case 2:
-              expect(failure).to.be.null
-              writeTextFile('tmp.scss', `@use 'dep'; body {background-color: dep.$primary-color color: red }`)
-              return step++
-            case 3:
-              expect(failure).to.be.not.null
-              writeTextFile('tmp.scss', `@use 'dep'; body {background-color: dep.$primary-color; color: red }`)
-              return step++
-            case 4:
-              expect(failure).to.be.null
-              expect(result).to.be.not.null
-              result!.stop!()
-              return step++
-          }
-        }
-      }
     })
+    const result = await ctx.rebuild()
 
     await new Promise((resolve, reject) => {
       writeTextFile('tmp.scss', `@use 'dep'; body {background-color: dep.$primary-color; color: red }`)
@@ -80,7 +88,7 @@ describe('tests covering github issues', function () {
           clearInterval(interval)
           try {
             expect(readTextFile('./tmp.css')).to.match(/background-color: #333;/)
-            result.stop!()
+            ctx.dispose(); // To free resources
             resolve(null)
           } catch (e) {
             reject(e)
@@ -96,7 +104,7 @@ describe('tests covering github issues', function () {
     let debug = sinon.fake()
     let warn = sinon.fake()
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index.scss'],
       outfile: './out/sample.css',
@@ -107,6 +115,7 @@ describe('tests covering github issues', function () {
         }
       })]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('./out/sample.css')).to.match(/z-index: 5;/)
     expect(debug).to.be.callCount(0)
@@ -119,7 +128,7 @@ describe('tests covering github issues', function () {
     let debug = sinon.fake()
     let warn = sinon.fake()
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index.js'],
       bundle: true,
@@ -133,6 +142,7 @@ describe('tests covering github issues', function () {
         }
       })]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('./out/index.js')).to.match(/background-color: rgb\(174, 101, 255\);/)
 
@@ -147,7 +157,7 @@ describe('tests covering github issues', function () {
 
     const includePath = path.resolve(__dirname, 'fixture/node_modules')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index.js'],
       bundle: true,
@@ -156,6 +166,7 @@ describe('tests covering github issues', function () {
         includePaths: [includePath]
       })]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('./out/index.css')).to.match(/background-color: red;/)
   })
@@ -165,7 +176,7 @@ describe('tests covering github issues', function () {
 
     const postcssUrl = require('postcss-url')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/FontA.tsx'],
       bundle: true,
@@ -191,6 +202,7 @@ describe('tests covering github issues', function () {
         })
       ]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('./dist/FontA.js')).match(/data:font\/woff2;base64/)
   })
@@ -201,7 +213,7 @@ describe('tests covering github issues', function () {
     let debug = sinon.fake()
     let warn = sinon.fake()
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.jsx'],
       outdir: './out',
@@ -213,6 +225,7 @@ describe('tests covering github issues', function () {
         }
       })]
     })
+    const result = await ctx.rebuild()
 
     expect(existsSync('./out/index.js')).to.be.true
 
@@ -229,7 +242,7 @@ describe('tests covering github issues', function () {
   it('#69 when building scss files main scss file source is first in sourcemap not last', async function () {
     const options = useFixture('../issues/69')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       plugins: [
         sassPlugin({
@@ -244,6 +257,7 @@ describe('tests covering github issues', function () {
       sourcemap: true,
       metafile: true
     })
+    const result = await ctx.rebuild()
 
     expect(readJsonFile('./dist/with_use.css.map')).to.eql({
       'version': 3,
@@ -257,13 +271,14 @@ describe('tests covering github issues', function () {
   it('#74 Support for deprecated css imports (leftover css urls starting with ~)', async function () {
     const options = useFixture('../issues/74')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/formio.scss'],
       bundle: true,
       outdir: './out',
       plugins: [sassPlugin({cssImports: true})]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('./out/formio.css'))
       .to.match(/\/\* \.\.\/node_modules\/dialog-polyfill\/dist\/dialog-polyfill\.css \*\//)
@@ -272,7 +287,7 @@ describe('tests covering github issues', function () {
   it('#107 generate proper sourcesContent', async function () {
     const options = useFixture('../issues/107')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       plugins: [
         sassPlugin()
@@ -283,6 +298,7 @@ describe('tests covering github issues', function () {
       ],
       sourcemap: true
     })
+    const result = await ctx.rebuild()
 
     expect(readJsonFile('./dist/index.css.map')).to.eql({
       'version': 3,

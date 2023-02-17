@@ -19,7 +19,7 @@ describe('unit tests', function () {
   it('can handle a css import', async function () {
     const options = useFixture('variables')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index-css.js'],
       outdir: './out',
@@ -28,6 +28,7 @@ describe('unit tests', function () {
         sassPlugin()
       ]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('out/index-css.js')).to.equalIgnoreSpaces(readTextFile('snapshot/index-css.js'))
     expect(readCssFile('out/index-css.css')).to.equalIgnoreSpaces(readCssFile('snapshot/index-css.css'))
@@ -36,7 +37,7 @@ describe('unit tests', function () {
   it('can handle a scss import', async function () {
     const options = useFixture('variables')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index-scss.js'],
       outdir: './out',
@@ -45,6 +46,7 @@ describe('unit tests', function () {
         sassPlugin()
       ]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('out/index-scss.js')).to.equalIgnoreSpaces(readTextFile('snapshot/index-scss.js'))
     expect(readCssFile('out/index-scss.css')).to.equalIgnoreSpaces(readCssFile('snapshot/index-scss.css'))
@@ -53,7 +55,7 @@ describe('unit tests', function () {
   it('can handle a sass import', async function () {
     const options = useFixture('variables')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index-sass.js'],
       outdir: './out',
@@ -62,6 +64,7 @@ describe('unit tests', function () {
         sassPlugin()
       ]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('out/index-sass.js')).to.equalIgnoreSpaces(readTextFile('snapshot/index-sass.js'))
     expect(readCssFile('out/index-sass.css')).to.equalIgnoreSpaces(readCssFile('snapshot/index-sass.css'))
@@ -72,50 +75,50 @@ describe('unit tests', function () {
 
     writeTextFile('./index.sass', readTextFile('./index-v1.sass'))
 
-    const result = await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index.js'],
       outdir: './out',
       bundle: true,
-      incremental: true,
       plugins: [sassPlugin()] // caching is enabled by default!
     })
+    const result = await ctx.rebuild()
 
     expect(fs.readFileSync('./out/index.css', 'utf-8').replace(/\/\*.+\*\//g, '')).to.equalIgnoreSpaces(`
       body { font: 100% Helvetica, sans-serif; color: #333; }
     `)
 
     writeTextFile('./index.sass', readTextFile('./index-v1.sass'))
-    await result.rebuild()
+    await ctx.rebuild()
     expect(fs.readFileSync('./out/index.css', 'utf-8').replace(/\/\*.+\*\//g, '')).to.equalIgnoreSpaces(`
       body { font: 100% Helvetica, sans-serif; color: #333; }
     `)
 
     writeTextFile('./dependency.sass', readTextFile('./dependency-v1.sass'))
     writeTextFile('./index.sass', readTextFile('./index-v2.sass'))
-    await result.rebuild()
+    await ctx.rebuild()
     expect(fs.readFileSync('./out/index.css', 'utf-8').replace(/\/\*.+\*\//g, '')).to.equalIgnoreSpaces(`
       body { background-color: red; } 
       body { font: 99% "Times New Roman", serif; color: #666; }
     `)
 
     writeTextFile('./dependency.sass', readTextFile('./dependency-v2.sass'))
-    await result.rebuild().catch(ignored => {})
+    await ctx.rebuild().catch(ignored => {})
 
     writeTextFile('./dependency.sass', readTextFile('./dependency-v3.sass'))
-    await result.rebuild()
+    await ctx.rebuild()
     expect(fs.readFileSync('./out/index.css', 'utf-8').replace(/\/\*.+\*\//g, '')).to.equalIgnoreSpaces(`
       body { background-color: blue; } 
       body { font: 99% "Times New Roman", serif; color: #666; }
     `)
 
-    result.rebuild.dispose()
+    ctx.dispose()
   })
 
   it('allows to specify a nonce for the <style> tag', async function () {
     const options = useFixture('nonce')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index.js'],
       outdir: './out',
@@ -127,6 +130,7 @@ describe('unit tests', function () {
         })
       ]
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('out/index.js')).to.equalIgnoreSpaces(readTextFile('snapshot.js'))
   })

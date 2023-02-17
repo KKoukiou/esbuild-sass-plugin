@@ -13,11 +13,7 @@ let result
 
 const watcher = chokidar.watch('./src', {ignoreInitial: true})
 
-watcher.on('ready', async function () {
-
-  console.time('initial build')
-
-  result = await esbuild.build({
+const buildOptions = {
     entryPoints: ["./src/generated/index.ts"],
     bundle: true,
     format: 'esm',
@@ -37,8 +33,16 @@ watcher.on('ready', async function () {
       })
     ],
     logLevel: 'debug'
-  })
+}
 
+// Create a context for incremental builds
+const ctx = await esbuild.context(buildOptions);
+
+watcher.on('ready', async function () {
+
+  console.time('initial build')
+  // Manually do initial build
+  await ctx.rebuild()
   console.timeEnd('initial build')
 })
 
@@ -46,9 +50,8 @@ watcher.on('change', async function () {
   if (result !== null) {
     console.time('incremental build')
 
-    const rebuild = result.rebuild()
-    result = null
-    result = await rebuild
+    // Manually do an incremental build
+    await ctx.rebuild()
 
     console.timeEnd('incremental build')
   }

@@ -6,7 +6,7 @@ const env = readFileSync('./env.scss', 'utf-8')
 
 const context = {color: 'blue'}
 
-esbuild.build({
+const ctx = await esbuild.context({
   entryPoints: ['index.js'],
   outdir: './out',
   bundle: true,
@@ -20,6 +20,7 @@ esbuild.build({
       }
     })
   ]
-}).then(() => {
+})
+.rebuild().then(() => {
   console.log('OK')
 }).catch(console.error)

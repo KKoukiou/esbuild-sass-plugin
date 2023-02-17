@@ -39,7 +39,7 @@ describe('e2e tests', function () {
   it('boostrap with sourcemaps', async function () {
     const options = useFixture('bootstrap')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.js'],
       outdir: './out',
@@ -52,6 +52,7 @@ describe('e2e tests', function () {
         })
       ]
     })
+    const result = await ctx.rebuild()
 
     const sourceMap = readJsonFile('out/index.css.map')
 
@@ -102,7 +103,7 @@ describe('e2e tests', function () {
   it('react with css loader', async function () {
     const options = useFixture('react')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.tsx'],
       outdir: './out',
@@ -112,6 +113,7 @@ describe('e2e tests', function () {
         sassPlugin()
       ]
     })
+    const result = await ctx.rebuild()
 
     let cssBundle = readTextFile('./out/index.css')
 
@@ -142,7 +144,7 @@ describe('e2e tests', function () {
   it('lit-element component (mix of dynamic style and imported css result)', async function () {
     const options = useFixture('lit-element')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.ts'],
       outdir: './out',
@@ -158,6 +160,7 @@ describe('e2e tests', function () {
         })
       ]
     })
+    const result = await ctx.rebuild()
 
     const bundle = readTextFile('./out/index.js')
 
@@ -213,7 +216,7 @@ describe('e2e tests', function () {
 
     const postCSS = postcss([autoprefixer, postcssPresetEnv({stage: 0})])
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['src/app.css'],
       outdir: 'out',
@@ -228,6 +231,7 @@ describe('e2e tests', function () {
         }
       })]
     })
+    const result = await ctx.rebuild()
 
     // NOTE: You might want to update these snapshots when you upgrade postcss!
 
@@ -243,7 +247,7 @@ describe('e2e tests', function () {
   it('css modules', async function () {
     const options = useFixture('css-modules')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.js'],
       outdir: './out',
@@ -257,6 +261,7 @@ describe('e2e tests', function () {
         })
       ]
     })
+    const result = await ctx.rebuild()
 
     const bundle = readTextFile('./out/index.js')
 
@@ -278,7 +283,7 @@ describe('e2e tests', function () {
   it('css modules & lit-element together', async function () {
     const options = useFixture('multiple')
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/main.js'],
       outdir: './out',
@@ -297,6 +302,7 @@ describe('e2e tests', function () {
         })
       ]
     })
+    const result = await ctx.rebuild()
 
     const main = readTextFile('./out/main.js')
 
@@ -336,7 +342,7 @@ describe('e2e tests', function () {
       '$iconic-font-path: \'open-iconic/font/fonts/\';'
     )
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/styles.scss'],
       outdir: './out',
@@ -351,11 +357,12 @@ describe('e2e tests', function () {
       },
       plugins: [sassPlugin()]
     })
+    const result = await ctx.rebuild()
 
     const outCSS = readTextFile('./out/styles.css')
     expect(outCSS).to.match(/url\(\.\/open-iconic-[^.]+\.eot\?#iconic-sm\) format\("embedded-opentype"\)/)
 
-    await esbuild.build({
+    const ctx_1 = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.ts'],
       outfile: './out/bundle.js',
@@ -370,13 +377,14 @@ describe('e2e tests', function () {
       },
       plugins: [sassPlugin()]
     })
+    await ctx_1.rebuild()
 
     const outFile = readTextFile('./out/bundle.css')
     expect(outFile).to.have.string(
       'src: url(data:application/vnd.ms-fontobject;base64,JG4AAHxt'
     )
 
-    await esbuild.build({
+    const ctx_2 = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.ts'],
       outdir: './out',
@@ -385,7 +393,7 @@ describe('e2e tests', function () {
       plugins: [sassPlugin({
         type: 'lit-css',
         async transform(css, resolveDir) {
-          const {outputFiles: [out]} = await esbuild.build({
+          const {outputFiles: [out]} = await esbuild.context({
             stdin: {
               contents: css,
               resolveDir,
@@ -406,6 +414,7 @@ describe('e2e tests', function () {
         }
       })]
     })
+    await ctx_2.rebuild()
 
     const outJS = readTextFile('./out/index.js')
     expect(outJS).to.have.string(
@@ -420,19 +429,24 @@ describe('e2e tests', function () {
     require('./fixture/watch/initial')
 
     let count = 0
+    const cntPlugin = {
+      name: 'my-plugin',
+      setup(build) {
+        let count = 0;
+        build.onEnd(result => {
+          count++
+        });
+      },
+    }
 
-    const result = await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./src/index.js'],
       outdir: './out',
       bundle: true,
-      plugins: [sassPlugin({type: 'css-text'})],
-      watch: {
-        onRebuild(error, result) {
-          count++
-        }
-      }
+      plugins: [sassPlugin({type: 'css-text'}), cntPlugin],
     })
+    const result = await ctx.rebuild()
 
     expect(readTextFile('./out/index.js')).to.match(/crimson/)
 
@@ -464,7 +478,7 @@ describe('e2e tests', function () {
 
     const context = {blue: 'blue'}
 
-    await esbuild.build({
+    const ctx = await esbuild.context({
       ...options,
       entryPoints: ['./index.js'],
       outdir: './out',
@@ -478,6 +492,7 @@ describe('e2e tests', function () {
         }
       })]
     })
+    const result = await ctx.rebuild()
 
     const bundle = readTextFile('./out/index.css')
 
